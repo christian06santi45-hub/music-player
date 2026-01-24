@@ -1,0 +1,153 @@
+import { useRef, useEffect } from "react";
+import { useMusic } from "../contexts/MusicContext.jsx";
+
+export const MusicPlayer = () => {
+  const {
+    currentTrack,
+    formatTime,
+    currentTime,
+    setCurrentTime,
+    duration,
+    setDuration,
+    nextTrack,
+    prevTrack,
+    isPlaying,
+    pause,
+    play,
+    volume,
+    setVolume,
+  } = useMusic();
+
+  const audioRef = useRef(null);
+
+  const handleTimeChange = (e) => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    const newTime = Number(e.target.value);
+    audio.currentTime = newTime;
+    setCurrentTime(newTime);
+  };
+
+  const handleVolumeChange = (e) => {
+    setVolume(Number(e.target.value));
+  };
+
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    audio.volume = volume;
+  }, [volume]);
+
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    if (!currentTrack?.url) return; // nothing to play
+
+    if (isPlaying) audio.play().catch(console.error);
+    else audio.pause();
+  }, [isPlaying, currentTrack]);
+
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    const handleLoadedMetadata = () => setDuration(audio.duration || 0);
+    const handleTimeUpdate = () => setCurrentTime(audio.currentTime || 0);
+    const handleEnded = () => currentTrack && nextTrack();
+
+    audio.addEventListener("loadedmetadata", handleLoadedMetadata);
+    audio.addEventListener("canplay", handleLoadedMetadata);
+    audio.addEventListener("timeupdate", handleTimeUpdate);
+    audio.addEventListener("ended", handleEnded);
+
+    return () => {
+      audio.removeEventListener("loadedmetadata", handleLoadedMetadata);
+      audio.removeEventListener("canplay", handleLoadedMetadata);
+      audio.removeEventListener("timeupdate", handleTimeUpdate);
+      audio.removeEventListener("ended", handleEnded);
+    };
+  }, [setDuration, setCurrentTime, currentTrack, nextTrack]);
+
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    audio.load();
+    setCurrentTime(0);
+    setDuration(0);
+  }, [currentTrack, setCurrentTime, setDuration]);
+
+  const progressPercentage = duration > 0 ? (currentTime / duration) * 100 : 0;
+
+  return (
+    <div className="music-player">
+      <audio
+        ref={audioRef}
+        src={currentTrack?.url ?? ""}
+        preload="metadata"
+        crossOrigin="anonymous"
+      />
+
+      <div className="track-info">
+        <h3 className="track-title">
+          {currentTrack?.title ?? "Select a song"}
+        </h3>
+        <p className="track-artist">{currentTrack?.artist ?? "—"}</p>
+      </div>
+
+      <div className="progress-container">
+        <span className="time">{formatTime(currentTime)}</span>
+        <input
+          type="range"
+          min="0"
+          max={duration || 0}
+          step="0.1"
+          value={currentTime || 0}
+          className="progress-bar"
+          onChange={handleTimeChange}
+          style={{ "--progress": `${progressPercentage}%` }}
+          disabled={!currentTrack?.url}
+        />
+        <span className="time">{formatTime(duration)}</span>
+      </div>
+
+      <div className="controls">
+        <button
+          className="control-btn"
+          onClick={prevTrack}
+          disabled={!currentTrack}
+        >
+          ⏮
+        </button>
+        <button
+          className="control-btn play-btn"
+          onClick={() => (isPlaying ? pause() : play())}
+          disabled={!currentTrack?.url}
+        >
+          {isPlaying ? "⏸" : "▶"}
+        </button>
+        <button
+          className="control-btn"
+          onClick={nextTrack}
+          disabled={!currentTrack}
+        >
+          ⏭
+        </button>
+      </div>
+
+      <div className="volume-container">
+        <span className="volume-icon">🔊</span>
+        <input
+          type="range"
+          min="0"
+          max="1"
+          step="0.1"
+          className="volume-bar"
+          onChange={handleVolumeChange}
+          value={volume}
+        />
+      </div>
+    </div>
+  );
+};
